@@ -8,7 +8,7 @@
     "type": "terminal"
   },
   "scripts": {
-    "agent": "node goal-tracker-agent.js",
+    "agent": "node goal-tracker-agent.cjs",
     "ui": "node -e \"const http = require('http'), fs = require('fs'), path = require('path'); http.createServer((req, res) => { let f = path.join(__dirname, 'ui', req.url === '/' ? 'index.html' : req.url); fs.readFile(f, (err, data) => { if (err) { res.writeHead(404); res.end('Not Found'); } else { const ext = path.extname(f); const mimes = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript' }; res.writeHead(200, { 'Content-Type': mimes[ext] || 'text/plain' }); res.end(data); } }); }).listen(4040, () => console.log('UI Dashboard running at http://localhost:4040'));\""
   },
   "dependencies": {

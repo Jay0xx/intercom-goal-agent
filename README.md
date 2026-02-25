@@ -31,32 +31,56 @@ Agents act as personal goal coaches: parse user goals (e.g., "Save $1000 by Marc
 - Gamified progress with tips/cheers.  
 - Minimal web UI for human input/monitoring.
 
-**Run with:**
-```bash
-pear run . --sc-bridge 1 --sc-bridge-token <token> --sidechannels goals
-```
+---
 
-## Quick Start
+## 🚀 Quick Start (Starting & Testing)
 
+Follow these steps to run the full stack on your local machine.
+
+### 1. Prerequisites
+- **Node.js**: [Download](https://nodejs.org/) (Use Node 20 or 22)
+- **Pear Runtime**: Install via npm:
+  ```bash
+  npm install -g pear
+  ```
+
+### 2. Setup
 ```bash
-# 1. Clone the fork
 git clone https://github.com/Jay0xx/intercom-goal-agent
 cd intercom-goal-agent
-
-# 2. Install deps
 npm install
-
-# 3. Start Intercom peer
-# Using pear runtime (must be installed)
-pear run . --peer-store-name agent1 --sc-bridge 1 --sc-bridge-token MY_TOKEN --sidechannels goals,reminders,goal-updates
-
-# 4. Start goal tracker agent
-export SC_BRIDGE_TOKEN=MY_TOKEN
-npm run agent
-
-# 5. Open dashboard
-# http://localhost:4040
 ```
+
+### 3. Start the Components (3 Terminals)
+
+**Terminal 1: The Intercom Bridge (P2P Network)**
+```bash
+# Windows (PowerShell):
+$env:PATH="C:\Users\a\AppData\Roaming\pear\bin;$env:PATH"
+pear run . --sc-bridge 1 --sc-bridge-token MY_TOKEN --sidechannels goals --peer-dht-bootstrap bootstrap1.hyperdht.org:49737,bootstrap2.hyperdht.org:49737
+```
+
+**Terminal 2: The AI Goal Agent (Logic & Coaching)**
+```bash
+# In the project root
+$env:SC_BRIDGE_TOKEN="MY_TOKEN"
+npm run agent
+```
+
+**Terminal 3: The Dashboard UI (Localhost)**
+```bash
+# In the project root
+npm run ui
+```
+
+### 4. Testing it Out
+1.  Open **[http://localhost:4040](http://localhost:4040)** in your browser.
+2.  Enter the token: **`MY_TOKEN`** and click **Connect**.
+3.  **Create a Goal**: Type `"Save $500 for a bike by June"` in the Description field, set the target/deadline, and click **Set Goal**.
+4.  **Update Progress**: In the "Update Progress" section, move the slider to **10%** and click **Update**.
+5.  **See the AI in Action**: Check the **Activity Log** at the bottom. You will see the AI generate a category-specific coach tip based on your update!
+
+---
 
 ## Features
 
@@ -71,13 +95,14 @@ npm run agent
 ## Project Structure
 
 ```
-├── index.js                  # Intercom core (upstream)
-├── goal-tracker-agent.js     # Main agent (Phase 3)
-├── SKILL.md                  # Full agent docs + instructions
-├── features/goal-tracker/    # Goal tracker logic
-├── features/sc-bridge/       # Intercom SC-Bridge (upstream)
-├── ui/                       # Browser dashboard
-└── contract/                 # Settlement bus contracts (upstream)
+├── index.js                    # Intercom core (upstream)
+├── goal-tracker-agent.cjs       # Main agent (Phase 3)
+├── run-local.ps1               # PowerShell one-click runner
+├── SKILL.md                    # Full agent docs + instructions
+├── features/goal-tracker/      # Goal tracker logic
+├── features/sc-bridge/         # Intercom SC-Bridge (upstream)
+├── ui/                         # Browser dashboard
+└── contract/                   # Settlement bus contracts (upstream)
 ```
 
 ## Docs
