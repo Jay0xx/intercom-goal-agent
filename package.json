@@ -1,11 +1,15 @@
 {
-  "name": "contract-test-latest",
-  "version": "0.0.1",
+  "name": "intercom-goal-agent",
+  "version": "1.0.0",
   "type": "module",
   "main": "index.js",
   "pear": {
-    "name": "contract-test-latest",
+    "name": "intercom-goal-agent",
     "type": "terminal"
+  },
+  "scripts": {
+    "agent": "node goal-tracker-agent.js",
+    "ui": "node -e \"const http = require('http'), fs = require('fs'), path = require('path'); http.createServer((req, res) => { let f = path.join(__dirname, 'ui', req.url === '/' ? 'index.html' : req.url); fs.readFile(f, (err, data) => { if (err) { res.writeHead(404); res.end('Not Found'); } else { const ext = path.extname(f); const mimes = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript' }; res.writeHead(200, { 'Content-Type': mimes[ext] || 'text/plain' }); res.end(data); } }); }).listen(4040, () => console.log('UI Dashboard running at http://localhost:4040'));\""
   },
   "dependencies": {
     "b4a": "^1.6.7",
@@ -18,7 +22,8 @@
     "trac-msb": "git+https://github.com/Trac-Systems/main_settlement_bus.git#5088921",
     "trac-peer": "git+https://github.com/Trac-Systems/trac-peer.git#d108f52",
     "trac-wallet": "1.0.1",
-    "util": "npm:bare-node-util"
+    "util": "npm:bare-node-util",
+    "ws": "^8.1.0"
   },
   "overrides": {
     "trac-wallet": "1.0.1"

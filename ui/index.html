@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goal Tracker — P2P Dashboard</title>
+  <meta name="description" content="P2P AI Goal Tracker Agent dashboard — set goals, track progress, and get motivational tips over Intercom sidechannels.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Header / Connection Bar ─────────────────────── -->
+  <header id="header">
+    <div class="header-top">
+      <h1>🎯 Goal Tracker</h1>
+      <span id="status-badge" class="badge badge-off">Disconnected</span>
+    </div>
+    <form id="connect-form" autocomplete="off">
+      <input id="ws-url" type="text" placeholder="ws://127.0.0.1:49222" aria-label="WebSocket URL">
+      <input id="ws-token" type="password" placeholder="SC-Bridge Token" aria-label="Auth Token">
+      <button id="connect-btn" type="submit">Connect</button>
+    </form>
+    <p id="error-bar" class="error-bar" hidden></p>
+  </header>
+
+  <!-- ── Main (hidden until connected) ───────────────── -->
+  <main id="main-content" hidden>
+
+    <!-- Section 1: Set New Goal -->
+    <section class="card" id="section-new-goal">
+      <h2>New Goal</h2>
+      <form id="goal-form">
+        <textarea id="goal-input" rows="2" placeholder='e.g. "Save $1000 by end of March" or "Run 100km in 2 months"'></textarea>
+        <button type="submit">Set Goal</button>
+      </form>
+    </section>
+
+    <!-- Section 2: Update Progress -->
+    <section class="card" id="section-progress">
+      <h2>Update Progress</h2>
+      <form id="progress-form">
+        <div class="progress-row">
+          <select id="progress-goal-select" aria-label="Select goal">
+            <option value="">— select goal —</option>
+          </select>
+          <input id="progress-value" type="number" min="0" max="100" placeholder="%" aria-label="Progress percent">
+          <button type="submit">Update</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 3: Goals List -->
+    <section class="card" id="section-goals">
+      <h2>Goals <span id="goals-count" class="count-badge">0</span></h2>
+      <div id="goals-list" class="goals-list">
+        <p class="empty-state">No goals yet. Create one above!</p>
+      </div>
+    </section>
+
+    <!-- Section 4: Activity Log -->
+    <section class="card" id="section-log">
+      <h2>Activity Log <button id="clear-log-btn" class="link-btn" type="button">Clear</button></h2>
+      <div id="activity-log" class="activity-log"></div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>P2P AI Goal Tracker · Intercom Fork · Phase 4 UI</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
