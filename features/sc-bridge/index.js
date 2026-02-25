@@ -89,7 +89,7 @@ class ScBridge extends Feature {
     try {
       const data = JSON.stringify(payload);
       client.socket.write(data);
-    } catch (_e) {}
+    } catch (_e) { }
   }
 
   _shouldEmit(client, channel, messageText) {
@@ -274,6 +274,26 @@ class ScBridge extends Feature {
           payload,
           invitePayload ? { invite: invitePayload } : undefined
         );
+
+        if (ok) {
+          // NEW: Local relay to other bridge clients (e.g. Agent <-> UI Dashboard)
+          const messageText = normalizeText(payload);
+          const event = {
+            type: 'sidechannel_message',
+            channel,
+            id: `local:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+            from: 'local-peer',
+            ts: Date.now(),
+            message: payload,
+          };
+          for (const other of this.clients) {
+            if (other === client || !other.ready) continue;
+            if (this._shouldEmit(other, channel, messageText)) {
+              this._broadcastToClient(other, event);
+            }
+          }
+        }
+
         if (!ok) {
           sendError('Send denied (invite required or invalid).');
           return;
@@ -575,7 +595,7 @@ class ScBridge extends Feature {
     if (!this.server) return;
     try {
       this.server.close();
-    } catch (_e) {}
+    } catch (_e) { }
     this.server = null;
     this.started = false;
     this.clients.clear();

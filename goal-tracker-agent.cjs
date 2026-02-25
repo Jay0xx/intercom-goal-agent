@@ -614,12 +614,16 @@ function handleIncomingMessage(raw) {
         const content = msg.message || msg.content || msg.data || ''
         const channel = msg.channel || CONFIG.channel
         const sender = msg.sender || msg.from || msg.publicKey || 'unknown'
-        logInfo(`[${channel}] ${String(sender).slice(0, 12)}…: "${String(content).slice(0, 120)}"`)
+        const displayContent = (typeof content === 'object') ? JSON.stringify(content) : String(content)
+        logInfo(`[${channel}] ${String(sender).slice(0, 12)}…: "${displayContent.slice(0, 120)}"`)
 
         // Try JSON action first
-        let jsonData = null
-        try { jsonData = JSON.parse(content) } catch (_) { }
+        let jsonData = (content && typeof content === 'object') ? content : null
+        if (!jsonData) {
+            try { jsonData = JSON.parse(content) } catch (_) { }
+        }
         if (jsonData && typeof jsonData === 'object') {
+            logDebug('Handle JSON:', JSON.stringify(jsonData))
             // PHASE 3: Inject sender info for peer encouragement
             if (!jsonData.sender && sender !== 'unknown') jsonData.sender = sender
             if (handleJsonAction(jsonData, channel)) return
