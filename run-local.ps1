@@ -1,4 +1,4 @@
-$env:PATH = "C:\Users\a\AppData\Roaming\pear\bin;" + $env:PATH
+$env:PATH = "$env:AppData\pear\bin;" + $env:PATH
 $env:SC_BRIDGE_TOKEN = "MY_TOKEN"
 
 Write-Host "🚀 Starting Intercom Bridge..." -ForegroundColor Cyan

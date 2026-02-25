@@ -56,7 +56,7 @@ npm install
 **Terminal 1: The Intercom Bridge (P2P Network)**
 ```bash
 # Windows (PowerShell):
-$env:PATH="C:\Users\a\AppData\Roaming\pear\bin;$env:PATH"
+$env:PATH="$env:AppData\pear\bin;$env:PATH"
 pear run . --sc-bridge 1 --sc-bridge-token MY_TOKEN --sidechannels goals --peer-dht-bootstrap bootstrap1.hyperdht.org:49737,bootstrap2.hyperdht.org:49737
 ```
 
