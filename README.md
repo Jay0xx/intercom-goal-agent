@@ -87,7 +87,7 @@ npm run ui
 - **Natural language goal parsing** — "Save $1000 in 3 months" → structured record
 - **5 goal categories** — Finance, Fitness, Learning, Wellness, General (auto-detected)
 - **60+ motivational tips** — Category × progress bracket × deadline proximity
-- **Auto-milestone suggestions** — Breaks large goals into 20%/50%/80%/100% checkpoints
+- **Daily streak tracking** — 🔥 counters and auto-reminders for accountability
 - **Peer cheering** — 40% chance auto-reply with encouragement (rate-limited)
 - **Clean dashboard** — Vanilla HTML/JS/CSS, no build tools, connects to same WS
 - **Local persistence** — `goals.json` + `localStorage` in browser

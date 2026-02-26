@@ -122,13 +122,16 @@ class ScBridge extends Feature {
     if (this.debug) {
       console.log(`[sc-bridge] clients ${this.clients.size}`);
     }
+    if (this.debug) {
+      console.log(`[sc-bridge] emit to client ${this.clients.size} clients check`);
+    }
     for (const client of this.clients) {
       if (!client.ready) continue;
       if (!this._shouldEmit(client, channel, messageText)) {
-        if (this.debug) console.log('[sc-bridge] filtered');
+        if (this.debug) console.log(`[sc-bridge] filtered for client (channel: ${channel})`);
         continue;
       }
-      if (this.debug) console.log('[sc-bridge] emit');
+      if (this.debug) console.log(`[sc-bridge] emitting message on ${channel} to client`);
       this._broadcastToClient(client, event);
     }
   }
@@ -278,6 +281,7 @@ class ScBridge extends Feature {
         if (ok) {
           // NEW: Local relay to other bridge clients (e.g. Agent <-> UI Dashboard)
           const messageText = normalizeText(payload);
+          if (this.debug) console.log(`[sc-bridge] local relay for ${channel}: ${messageText.slice(0, 50)}`);
           const event = {
             type: 'sidechannel_message',
             channel,
@@ -289,6 +293,7 @@ class ScBridge extends Feature {
           for (const other of this.clients) {
             if (other === client || !other.ready) continue;
             if (this._shouldEmit(other, channel, messageText)) {
+              if (this.debug) console.log(`[sc-bridge] relayed to other client on ${channel}`);
               this._broadcastToClient(other, event);
             }
           }
@@ -331,6 +336,10 @@ class ScBridge extends Feature {
               sendError('Join denied (invite required or invalid).');
               return;
             }
+            // NEW: Also add to client's subscription set so they receive messages via the bridge
+            if (!client.channels) client.channels = new Set();
+            client.channels.add(channel);
+            if (this.debug) console.log(`[sc-bridge] client joined + subscribed to ${channel}`);
             reply({ type: 'joined', channel });
           })
           .catch((err) => {

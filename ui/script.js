@@ -142,6 +142,7 @@ function renderGoals() {
         ${meta.length ? `<div class="goal-card-meta">${meta.join(' · ')}</div>` : ''}
         <div class="goal-bar-wrap"><div class="${barClass}" style="width:${pct}%"></div></div>
         <div class="goal-pct">${pct}%${isComplete ? ' ✅' : ''}</div>
+        <div class="streak">🔥 ${g.streak || 0}-day streak</div>
         ${tipHtml}
       </div>
     `
@@ -157,7 +158,11 @@ function rebuildSelect() {
 }
 
 // ─── Parse incoming message for goal state ───────────────
-function processGoalMessage(data) {
+function processGoalMessage(rawData) {
+    let data = rawData
+    if (typeof data === 'string') {
+        try { data = JSON.parse(data) } catch (_) { return }
+    }
     if (!data || !data.action) return
 
     switch (data.action) {
@@ -173,6 +178,8 @@ function processGoalMessage(data) {
                 progress: goal.progress || 0,
                 status: goal.status || 'active',
                 category: goal.category || data.category || '',
+                streak: goal.streak || data.streak || 0,
+                lastUpdateDate: goal.lastUpdateDate || data.lastUpdateDate || null,
                 tip: data.tip || ''
             }
             persistGoals()
@@ -188,6 +195,8 @@ function processGoalMessage(data) {
                 goals[id].progress = goal.progress ?? data.progress ?? goals[id].progress
                 goals[id].status = goal.status || goals[id].status
                 if (data.tip) goals[id].tip = data.tip
+                if (goal.streak !== undefined) goals[id].streak = goal.streak
+                if (data.streak !== undefined) goals[id].streak = data.streak
                 if (goal.category) goals[id].category = goal.category
                 persistGoals()
                 renderGoals()
@@ -213,6 +222,10 @@ function processGoalMessage(data) {
                 persistGoals()
                 renderGoals()
             }
+            break
+        }
+        case 'reminder': {
+            addLog(data.originPeer || 'agent', `🔔 REMINDER: ${data.message}`)
             break
         }
     }

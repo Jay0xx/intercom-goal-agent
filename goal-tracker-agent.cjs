@@ -13,13 +13,12 @@
  *   large goals, and cheers peers on progress updates with a
  *   natural, randomized tone. It responds helpfully and positively.
  *
- * PHASE 3 ADDITIONS:
- *   • categorizeGoal() — keyword-based goal classification
- *   • generateTip() — rewritten: category+bracket+deadline-aware
- *   • generateMilestoneSuggestions() — auto-breakdowns
- *   • generateResponseToPeer() — peer encouragement
- *   • Auto-reply to peer updates (30-50% chance, rate-limited)
- *   • Rate-limited auto-tips on local mutations
+ * PHASE 4: Streak Tracking & Auto-Reminders
+ *   • streak: 🔥 counters for daily updates
+ *   • auto-reminders: hourly check for inactive goals (>24h since last update)
+ *   • streaks are calculated on UTC days
+ *
+ * NOTE: Milestones and buddy pairing are NOT included as per Phase 4 requirements.
  *
  * HOW TO RUN:
  *   pear run . --sc-bridge 1 --sc-bridge-token TOKEN --sidechannels goals,reminders,goal-updates
@@ -44,9 +43,9 @@ const CONFIG = {
     reconnectBaseMs: 5000, reconnectMaxMs: 60000, maxReconnectAttempts: 30,
     peerId: 'agent-' + Math.random().toString(36).slice(2, 8),
     // PHASE 3: Rate limiting
-    autoReplyChance: 0.4,        // 40% chance to auto-reply to peer updates
-    tipCooldownMs: 30000,        // Min 30s between auto-tips
-    peerReplyCooldownMs: 15000   // Min 15s between peer replies
+    autoReplyChance: 1.0,        // 100% for testing (usually 0.4)
+    tipCooldownMs: 15000,        // Lowered to 15s for better feedback
+    peerReplyCooldownMs: 5000    // Lowered to 5s for better feedback
 }
 
 // ─── §2 Logging ──────────────────────────────────────────
@@ -113,7 +112,10 @@ function parseGoalBody(body) {
 function createGoal(description, target, deadline, forceId) {
     const id = forceId || nextGoalId()
     if (goals[id]) { logDebug(`Goal ${id} exists — skip`); return goals[id] }
-    const goal = { id, description, target, deadline, progress: 0, history: [], createdAt: Date.now(), status: 'active' }
+    const goal = {
+        id, description, target, deadline, progress: 0, history: [], createdAt: Date.now(), status: 'active',
+        streak: 0, lastUpdateDate: null, lastReminderDate: null // PHASE 4: Streak & Reminders
+    }
     goals[id] = goal; saveGoals()
     logOk(`Goal created: ${id} — "${description}"`)
     return goal
@@ -125,9 +127,30 @@ function updateProgress(id, percent) {
     if (goal.status !== 'active') { logWarn(`Goal ${id} already ${goal.status}`); return null }
     const old = goal.progress
     goal.progress = Math.min(100, Math.max(0, percent))
-    goal.history.push({ timestamp: Date.now(), progress: goal.progress, note: `${old}% → ${goal.progress}%` })
+
+    // ─── Streak Tracking (PHASE 4) ───
+    const today = new Date().toISOString().split('T')[0]
+    if (!goal.streak) goal.streak = 0
+    if (!goal.lastUpdateDate) {
+        goal.streak = 1
+        goal.lastUpdateDate = today
+    } else if (today !== goal.lastUpdateDate) {
+        const last = new Date(goal.lastUpdateDate)
+        const nextDay = new Date(last)
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1)
+        const nextDayStr = nextDay.toISOString().split('T')[0]
+
+        if (today === nextDayStr) {
+            goal.streak += 1
+        } else {
+            goal.streak = 1
+        }
+        goal.lastUpdateDate = today
+    }
+
+    goal.history.push({ timestamp: Date.now(), progress: goal.progress, note: `${old}% → ${goal.progress}%`, streak: goal.streak })
     if (goal.progress >= 100) { goal.progress = 100; goal.status = 'completed'; logOk(`🎉 Goal ${id} COMPLETED`) }
-    else { logOk(`Goal ${id}: ${old}% → ${goal.progress}%`) }
+    else { logOk(`Goal ${id}: ${old}% → ${goal.progress}% (Streak: ${goal.streak})`) }
     saveGoals(); return goal
 }
 
@@ -302,8 +325,10 @@ function generateTip(goal) {
     if (p >= 30 && p < 70) bracket = 'momentum'
     else if (p >= 70) bracket = 'finish'
 
+    logDebug(`Tip for goal ${goal.id}: cat=${cat}, bracket=${bracket}, progress=${p}%`)
+
     const bank = (TIP_BANKS[cat] && TIP_BANKS[cat][bracket]) || TIP_BANKS.general[bracket]
-    let tip = pick(bank, goal.id)
+    let tip = pick(bank)
 
     // PHASE 3: Deadline urgency overlay
     const daysLeft = daysUntilDeadline(goal)
@@ -330,44 +355,40 @@ function generateRandomTip() {
     return { goalId: goal.id, tip: generateTip(goal) }
 }
 
-function pick(pool, goalId) {
-    const day = Math.floor(Date.now() / 86400000)
-    const seed = (goalId || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-    return pool[(seed + day) % pool.length]
+function pick(pool) {
+    if (!pool || pool.length === 0) return '🎯 Keep going!'
+    return pool[Math.floor(Math.random() * pool.length)]
 }
 
-// ─── §8 PHASE 3: Milestone Suggestions (NEW) ────────────
-/**
- * Auto-generate 3-5 milestone breakpoints for a goal.
- * Best when progress is 0 or low.
- *
- * @param {Object} goal
- * @returns {string} Formatted milestone suggestion text
- */
-function generateMilestoneSuggestions(goal) {
-    // Try to extract a numeric target
-    const numMatch = String(goal.target).match(/([\d,]+(?:\.\d+)?)/)
-    if (!numMatch) {
-        return `📍 Milestone suggestion: Break "${goal.description}" into 4 smaller checkpoints and celebrate each one!`
-    }
+// ─── §8 PHASE 4: Auto-Reminders ──────────────────────────
+let reminderInterval = null
+function startReminders() {
+    if (reminderInterval) return
+    logInfo('Starting auto-reminders interval (hourly)')
+    reminderInterval = setInterval(() => {
+        const now = new Date()
+        Object.values(goals).forEach(goal => {
+            if (goal.status !== 'active' || goal.progress >= 100) return
 
-    const total = parseFloat(numMatch[1].replace(/,/g, ''))
-    if (total <= 0 || isNaN(total)) {
-        return `📍 Try breaking "${goal.description}" into weekly mini-goals.`
-    }
+            const lastRem = goal.lastReminderDate ? new Date(goal.lastReminderDate) : null
+            const hoursSinceLast = lastRem ? (now - lastRem) / 3600000 : 999
 
-    const unit = String(goal.target).replace(numMatch[0], '').trim() || ''
-    const milestones = [0.2, 0.5, 0.8, 1.0]
-    const points = milestones.map(m => {
-        const val = Math.round(total * m)
-        return `  ${m * 100}%: ${unit}${val}`
-    })
-
-    return [
-        `📍 Suggested milestones for "${goal.description}":`,
-        ...points,
-        `  🎉 Celebrate each checkpoint to stay motivated!`
-    ].join('\n')
+            if (hoursSinceLast >= 24) {
+                const streak = goal.streak || 0
+                const reminderText = `Keep your 🔥 ${streak}-day streak alive! Update progress on "${goal.description}" today.`
+                logInfo(`Sending reminder for goal ${goal.id}`)
+                sendToChannel(JSON.stringify({
+                    action: 'reminder',
+                    goalId: goal.id,
+                    message: reminderText,
+                    originPeer: CONFIG.peerId,
+                    timestamp: now.getTime()
+                }), CONFIG.channel)
+                goal.lastReminderDate = now.toISOString()
+                saveGoals()
+            }
+        })
+    }, 3600000)
 }
 
 // ─── §9 PHASE 3: Peer Encouragement (NEW) ───────────────
@@ -424,16 +445,16 @@ function shouldAutoReplyToPeer() {
 
 /**
  * PHASE 3: Maybe send an auto-tip after local mutations.
- * Triggers every 3rd mutation, rate-limited.
+ * Triggers on every mutation for testing, rate-limited.
  */
 function maybeAutoTip(channel) {
     mutationCount++
-    if (mutationCount % 3 !== 0) return
+    // if (mutationCount % 3 !== 0) return 
     const now = Date.now()
     if (now - lastAutoTipTime < CONFIG.tipCooldownMs) return
     lastAutoTipTime = now
     const { tip } = generateRandomTip()
-    logInfo('Auto-tip triggered:', tip.slice(0, 80))
+    logOk('Auto-tip triggered: ' + tip.slice(0, 80))
     sendToChannel(`🤖 ${tip}`, channel)
 }
 
@@ -463,7 +484,7 @@ function helpText() {
         '  Help                                 — This message', '',
         '  JSON: { "action": "set_goal"|"update_progress"|"tip_request"|"list_goals"|"remove_goal", ... }', '',
         '─'.repeat(44),
-        '🤖 I auto-generate tips, suggest milestones, and cheer peers!'
+        '🤖 I auto-generate tips, track streaks, and cheer peers!'
     ].join('\n')
 }
 
@@ -479,7 +500,7 @@ function sendToChannel(content, channel) {
     return sendMessage({ type: 'send', channel: channel || CONFIG.channel, message: typeof content === 'string' ? content : JSON.stringify(content) })
 }
 function broadcastUpdate(action, goalData, tip) {
-    const payload = { action, originPeer: CONFIG.peerId, timestamp: Date.now(), goal: { id: goalData.id, description: goalData.description, target: goalData.target, deadline: goalData.deadline, progress: goalData.progress, status: goalData.status } }
+    const payload = { action, originPeer: CONFIG.peerId, timestamp: Date.now(), goal: { id: goalData.id, description: goalData.description, target: goalData.target, deadline: goalData.deadline, progress: goalData.progress, status: goalData.status, streak: goalData.streak } }
     if (tip) payload.tip = tip
     const s = JSON.stringify(payload)
     sendToChannel(s, CONFIG.channel)
@@ -493,12 +514,17 @@ function authenticate() {
     logInfo('Authenticating...'); sendMessage({ type: 'auth', token: CONFIG.token })
 }
 function joinChannels() {
-    for (const ch of [CONFIG.channel, ...CONFIG.extraChannels]) { logInfo(`Joining "${ch}"`); sendMessage({ type: 'join', channel: ch }) }
+    for (const ch of [CONFIG.channel, ...CONFIG.extraChannels]) {
+        logInfo(`Joining "${ch}"`)
+        sendMessage({ type: 'join', channel: ch })
+        sendMessage({ type: 'subscribe', channels: [ch] })
+    }
 }
 function onAuthenticated() {
     logOk('Authenticated ✔'); authenticated = true; joinChannels()
-    sendToChannel(JSON.stringify({ action: 'agent_status', originPeer: CONFIG.peerId, agent: 'goal-tracker-v3', status: 'online', timestamp: Date.now(), goalsTracked: Object.keys(goals).length }))
+    sendToChannel(JSON.stringify({ action: 'agent_status', originPeer: CONFIG.peerId, agent: 'goal-tracker-v4', status: 'online', timestamp: Date.now(), goalsTracked: Object.keys(goals).length }))
     logOk(`Online — ${Object.keys(goals).length} goal(s)`)
+    startReminders() // Start hourly check
 }
 
 // ─── §13 JSON Action Handler (PHASE 3: enhanced) ────────
@@ -511,10 +537,9 @@ function handleJsonAction(data, channel) {
             const desc = data.description || ''; if (!desc) { sendToChannel(JSON.stringify({ action: 'error', originPeer: CONFIG.peerId, message: 'set_goal needs description' }), channel); return true }
             const goal = createGoal(desc, data.target || desc, data.deadline || 'No specific deadline', data.goalId || null)
             const tip = generateTip(goal)
+            logOk(`Created goal [${goal.id}] for peer and generated tip: "${tip.slice(0, 50)}..."`)
             broadcastUpdate('goal_created', goal, tip)
-            // PHASE 3: Auto-suggest milestones for new goals
-            const milestones = generateMilestoneSuggestions(goal)
-            sendToChannel(`✅ [${goal.id}] ${goal.description}\n💡 ${tip}\n\n${milestones}`, channel)
+            sendToChannel(`✅ [${goal.id}] ${goal.description}\n💡 ${tip}`, channel)
             maybeAutoTip(channel)
             return true
         }
@@ -524,6 +549,7 @@ function handleJsonAction(data, channel) {
             const goal = updateProgress(id, prog)
             if (!goal) { sendToChannel(JSON.stringify({ action: 'error', originPeer: CONFIG.peerId, message: `Goal "${id}" not found/inactive` }), channel); return true }
             const tip = generateTip(goal)
+            logOk(`Updated goal [${id}] to ${prog}% and generated tip: "${tip.slice(0, 50)}..."`)
             broadcastUpdate('progress_updated', goal, tip)
             sendToChannel(`📊 [${goal.id}] ${goal.description}: ${progressBar(goal.progress)} ${goal.progress}%\n💡 ${tip}`, channel)
             // PHASE 3: Auto-reply with peer encouragement (probabilistic)
@@ -531,7 +557,7 @@ function handleJsonAction(data, channel) {
                 lastPeerReplyTime = Date.now()
                 const cheer = generateResponseToPeer({ from: data.originPeer || data.sender, goalId: id, progress: prog, description: goal.description })
                 sendToChannel(cheer, channel)
-                logNet('Auto-cheer sent ✔')
+                logNet(`Auto-cheer sent to ${data.sender || 'peer'} ✔`)
             }
             maybeAutoTip(channel)
             return true
@@ -543,7 +569,7 @@ function handleJsonAction(data, channel) {
             return true
         }
         case 'list_goals': {
-            sendToChannel(JSON.stringify({ action: 'goals_list', originPeer: CONFIG.peerId, goals: Object.values(goals).map(g => ({ id: g.id, description: g.description, target: g.target, deadline: g.deadline, progress: g.progress, status: g.status, category: categorizeGoal(g) })), count: Object.keys(goals).length, timestamp: Date.now() }), channel)
+            sendToChannel(JSON.stringify({ action: 'goals_list', originPeer: CONFIG.peerId, goals: Object.values(goals).map(g => ({ id: g.id, description: g.description, target: g.target, deadline: g.deadline, progress: g.progress, status: g.status, category: categorizeGoal(g), streak: g.streak || 0 })), count: Object.keys(goals).length, timestamp: Date.now() }), channel)
             return true
         }
         case 'remove_goal': {
@@ -566,10 +592,8 @@ function dispatchCommand(parsed, channel) {
             const goal = createGoal(args.description, args.target, args.deadline)
             const tip = generateTip(goal)
             broadcastUpdate('goal_created', goal, tip)
-            // PHASE 3: Include milestone suggestions in response
-            const milestones = generateMilestoneSuggestions(goal)
             maybeAutoTip(channel)
-            return `✅ Goal created: [${goal.id}] ${goal.description}\n   Target: ${goal.target} | Deadline: ${goal.deadline}\n   💡 ${tip}\n\n${milestones}`
+            return `✅ Goal created: [${goal.id}] ${goal.description}\n   Target: ${goal.target} | Deadline: ${goal.deadline}\n   💡 ${tip}`
         }
         case 'update': {
             const goal = updateProgress(args.id, args.progress)
@@ -586,8 +610,7 @@ function dispatchCommand(parsed, channel) {
         }
         case 'status': {
             const g = goals[args.id]; if (!g) return `❌ "${args.id}" not found.`
-            // PHASE 3: Include milestones in status view
-            return formatGoalCard(g) + '\n\n' + generateMilestoneSuggestions(g)
+            return formatGoalCard(g)
         }
         case 'remove': {
             if (!removeGoal(args.id)) return `❌ "${args.id}" not found.`
@@ -623,18 +646,20 @@ function handleIncomingMessage(raw) {
             try { jsonData = JSON.parse(content) } catch (_) { }
         }
         if (jsonData && typeof jsonData === 'object') {
-            logDebug('Handle JSON:', JSON.stringify(jsonData))
+            logDebug('Handle JSON Action:', JSON.stringify(jsonData))
             // PHASE 3: Inject sender info for peer encouragement
             if (!jsonData.sender && sender !== 'unknown') jsonData.sender = sender
             if (handleJsonAction(jsonData, channel)) return
         }
 
         // Plaintext fallback
+        logDebug('Handle Plaintext:', String(content))
         const parsed = parseGoalInput(String(content))
         if (parsed) { sendToChannel(dispatchCommand(parsed, channel), channel); return }
 
-        if (channel === CONFIG.channel) {
-            sendToChannel('🤖 I didn\'t understand that. Type "Help" for commands.', channel)
+        if (channel === CONFIG.channel && String(content).trim().length > 0) {
+            logDebug('Unknown plaintext command on main channel')
+            // sendToChannel('🤖 I didn\'t understand that. Type "Help" for commands.', channel)
         }
         return
     }
@@ -679,8 +704,8 @@ process.on('unhandledRejection', (r) => { logError('Unhandled rejection:', r) })
 // ─── §18 Main ────────────────────────────────────────────
 function main() {
     console.log('\n═══════════════════════════════════════════════')
-    console.log('  🎯 P2P AI Goal Tracker Agent — Phase 3      ')
-    console.log('     Smart Tips • Milestones • Peer Cheering   ')
+    console.log('  🎯 P2P AI Goal Tracker Agent — Phase 4      ')
+    console.log('     Streak Tracking • Auto-Reminders          ')
     console.log('═══════════════════════════════════════════════\n')
     logInfo(`SC-Bridge:  ${CONFIG.wsUrl}`)
     logInfo(`Token:      ${CONFIG.token ? CONFIG.token.slice(0, 4) + '****' : '(NOT SET!)'}`)

@@ -1,6 +1,6 @@
 ---
 name: P2P AI Goal Tracker Agent
-description: Collaborative goal tracking agent for Intercom/Trac Network — parses goals, tracks progress P2P, generates motivational tips, cheers peers.
+description: Collaborative goal tracking agent for Intercom/Trac Network — tracks daily streaks for goals and sends periodic motivational reminders to the 'goals' channel to encourage consistent updates.
 ---
 
 # P2P AI Goal Tracker Agent
@@ -11,7 +11,7 @@ This fork implements a collaborative AI Goal Tracker Agent on the Intercom/Trac 
 
 ### Description
 
-Agents act as personal goal coaches: parse user goals (e.g., "Save $1000 by March"), track progress P2P, generate motivational tips/reminders based on progress/deadline/category, suggest milestones, and cheer/respond to peer updates in sidechannel "goals".
+Agents act as personal goal coaches: parse user goals (e.g., "Save $1000 by March"), track progress P2P, generate motivational tips/reminders based on progress/deadline/category, track daily streaks with 🔥 counters, and cheer/respond to peer updates in sidechannel "goals". The agent sends periodic motivational reminders to encourage consistent updates.
 
 ### Instructions for AI Agents
 
@@ -33,7 +33,8 @@ Agents act as personal goal coaches: parse user goals (e.g., "Save $1000 by Marc
 - Real-time P2P goal accountability
 - Gamified progress with tips/cheers
 - Category-aware coaching (finance, fitness, learning, wellness)
-- Auto-milestone suggestions for large goals
+- Daily streak tracking with 🔥 counters
+- Periodic auto-reminders for accountability
 - Minimal web UI for human input/monitoring
 - Local JSON persistence + subnet-ready serialisation
 
@@ -145,7 +146,8 @@ Help
 │ • parseGoalInput() │ ◄── JSON/text ──│                    │
 │ • categorizeGoal() │                 └────────────────────┘
 │ • generateTip()    │
-│ • milestones       │
+│ • daily streaks    │
+│ • auto-reminders   │
 │ • peer cheering    │
 │ • goals.json       │
 └────────┬───────────┘
@@ -166,7 +168,7 @@ Help
 ```
 intercom-goal-tracker/
 ├── index.js                    # Intercom core (upstream)
-├── goal-tracker-agent.js       # Standalone agent
+├── goal-tracker-agent.cjs       # Standalone agent (Phase 4)
 ├── SKILL.md                    # This file
 ├── features/
 │   ├── goal-tracker/           # Our logic

@@ -1,4 +1,5 @@
 {
   "goals": {},
-  "counter": 0
+  "counter": 0,
+  "buddyPubkey": null
 }
